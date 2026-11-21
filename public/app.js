@@ -126,7 +126,7 @@ function sourcesHtml(sources) {
     .join("");
   const label = sources.length === 1 ? "1 source" : `${sources.length} sources`;
   return `
-    <details class="sources" open>
+    <details class="sources">
       <summary>${label}</summary>
       <ul class="source-list">${items}</ul>
     </details>`;
@@ -285,4 +285,4 @@ els.reset.addEventListener("click", () => {
 
 checkHealth();
 loadEmployees().catch(() => {});
-els.input.focus();
+if (window.matchMedia("(min-width: 941px)").matches) focusInput();
