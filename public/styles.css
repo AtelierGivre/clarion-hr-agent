@@ -48,6 +48,13 @@ body {
   background: #04070a url("/assets/background.webp") center 16% / cover no-repeat;
 }
 
+@media (min-width: 941px) {
+  .backdrop {
+    background-image: url("/assets/background-wide.webp");
+    background-position: center 46%;
+  }
+}
+
 .backdrop::after {
   content: "";
   position: absolute;
