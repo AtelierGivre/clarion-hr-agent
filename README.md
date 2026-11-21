@@ -1,4 +1,4 @@
-# Compass
+# Clarion
 
 An HR and IT assistant that answers from company policy, reads employee records through an MCP server, and cites every claim.
 
@@ -12,7 +12,7 @@ This repository is my submission for the GoAified AI internship assignment.
 
 ## What it does
 
-You ask a question in plain English. Compass decides whether the answer comes from written policy, from your own employee record, or both. Policy answers are retrieved from a vector index and shown with the exact section they came from. Personal answers are read by an MCP tool that can only touch the signed in employee's row.
+You ask a question in plain English. Clarion decides whether the answer comes from written policy, from your own employee record, or both. Policy answers are retrieved from a vector index and shown with the exact section they came from. Personal answers are read by an MCP tool that can only touch the signed in employee's row.
 
 It stays inside HR and IT. Prompt injection attempts are stopped before any model call, personal data is redacted on the way out, and a policy answer without a source is not allowed through.
 

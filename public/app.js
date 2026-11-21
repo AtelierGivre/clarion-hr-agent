@@ -100,7 +100,7 @@ function addTyping() {
   node.id = "typing";
   node.innerHTML = `
     <div class="bubble">
-      <div class="who"><span class="avatar">C</span><strong>Compass</strong><span class="sep">·</span><span>Reading policy and records</span></div>
+      <div class="who"><span class="avatar">C</span><strong>Clarion</strong><span class="sep">·</span><span>Reading policy and records</span></div>
       <div class="typing" aria-label="Thinking"><i></i><i></i><i></i></div>
     </div>`;
   els.thread.appendChild(node);
@@ -169,7 +169,7 @@ function addAgentMessage(result) {
   node.innerHTML = `
     <div class="bubble">
       <div class="who">
-        <span class="avatar">C</span><strong>Compass</strong>
+        <span class="avatar">C</span><strong>Clarion</strong>
         <span class="sep">·</span><span>${escapeHtml(route)}</span>
         <span class="sep">·</span><span>${seconds}s</span>
       </div>
@@ -190,7 +190,7 @@ function addErrorMessage(detail) {
   node.className = "msg agent error";
   node.innerHTML = `
     <div class="bubble">
-      <div class="who"><span class="avatar">C</span><strong>Compass</strong><span class="sep">·</span><span>Offline</span></div>
+      <div class="who"><span class="avatar">C</span><strong>Clarion</strong><span class="sep">·</span><span>Offline</span></div>
       <div class="answer">I could not reach the agent just now. Please try again in a moment.</div>
       <div class="meta"><div class="chips"><span class="chip blocked"><span class="dot"></span>${escapeHtml(detail)}</span></div></div>
     </div>`;

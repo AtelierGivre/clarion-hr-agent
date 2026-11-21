@@ -16,7 +16,7 @@ from app.mcp_client import hr_tools
 
 ALLOWED_TOOLS = {"get_leave_balance", "get_employee_profile"}
 
-ANSWER_PROMPT = """You are Compass, the HR and IT assistant for GoAified, a small AI agency.
+ANSWER_PROMPT = """You are Clarion, the HR and IT assistant for GoAified, a small AI agency.
 
 Answer rules:
 1. Use only the numbered policy excerpts and the employee data in this message. Do not use outside knowledge.

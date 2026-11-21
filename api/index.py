@@ -14,7 +14,7 @@ from app import config
 from app.agent import run_agent
 from app.db import get_conn
 
-app = FastAPI(title="Compass", docs_url="/api/docs", openapi_url="/api/openapi.json")
+app = FastAPI(title="Clarion", docs_url="/api/docs", openapi_url="/api/openapi.json")
 
 
 class ChatRequest(BaseModel):
