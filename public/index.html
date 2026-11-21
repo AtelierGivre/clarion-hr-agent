@@ -6,6 +6,9 @@
   <title>Clarion · HR and IT answers with sources</title>
   <meta name="description" content="Ask about leave, expenses, remote work, or IT. Every answer shows its sources.">
   <meta name="theme-color" content="#05080b">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
   <link rel="stylesheet" href="/styles.css">
   <link rel="preload" as="image" href="/assets/background-wide.webp" media="(min-width: 941px)">
   <link rel="preload" as="image" href="/assets/background.webp" media="(max-width: 940px)">
@@ -23,20 +26,38 @@
         <span>HR and IT assistant for GoAified</span>
       </span>
     </div>
-    <div class="status" id="status" title="Checking connection">
-      <span class="dot"></span><span id="status-text">Connecting</span>
+    <nav class="nav" aria-label="Page sections">
+      <a href="#how">How it works</a>
+      <a href="#tests">Tests</a>
+      <a href="https://github.com/AtelierGivre/compass-hr-agent#readme" target="_blank" rel="noreferrer">Source <span aria-hidden="true">&#8599;</span></a>
+    </nav>
+    <div class="top-actions">
+      <div class="status" id="status" title="Checking connection">
+        <span class="dot"></span><span id="status-text">Connecting</span>
+      </div>
+      <button class="cta" id="ask-cta" type="button">Ask Clarion <span aria-hidden="true">&#8594;</span></button>
     </div>
   </header>
 
-  <main class="shell">
+  <main class="shell" id="top">
     <section class="intro">
-      <p class="eyebrow">Grounded answers, not guesses</p>
-      <h1>Ask about work.<br>See where the answer came from.</h1>
-      <p class="lede">
-        Clarion reads GoAified policy documents, checks your own records through an MCP
-        server on Postgres, and cites every claim. It stays inside HR and IT, and it
-        never repeats personal data.
-      </p>
+      <div class="wordmark" aria-hidden="true">CLARION</div>
+      <div class="intro-foot">
+        <div class="intro-copy">
+          <p class="eyebrow">HR and IT, grounded in policy</p>
+          <h1>Ask about work.<br><em>See the source.</em></h1>
+          <p class="lede">
+            Clarion reads GoAified policy documents, checks your own records through an MCP
+            server on Postgres, and cites every claim. It stays inside HR and IT, and it
+            never repeats personal data.
+          </p>
+        </div>
+        <aside class="intro-aside">
+          <p class="aside-lead">More clarity.<br>Less guesswork.</p>
+          <p class="aside-copy">Every claim carries its source, and personal data stays out of the transcript.</p>
+          <a class="aside-link" href="#how">See the guardrails <span aria-hidden="true">&#8594;</span></a>
+        </aside>
+      </div>
     </section>
 
     <div class="workspace">
@@ -123,7 +144,7 @@
       </section>
 
       <aside class="side">
-        <section class="panel">
+        <section class="panel" id="how">
           <h2>How it works</h2>
           <ol class="steps">
             <li>
@@ -150,7 +171,7 @@
           </ol>
         </section>
 
-        <section class="panel muted">
+        <section class="panel muted" id="tests">
           <h2>Tested, not assumed</h2>
           <p class="panel-copy">
             12 questions run against this agent, including two prompt injection attempts,
@@ -164,10 +185,23 @@
         </section>
       </aside>
     </div>
+
+    <section class="library" aria-label="Policy library">
+      <span class="library-label">Grounded in</span>
+      <ul class="library-list">
+        <li>Leave and time off</li>
+        <li>Expenses</li>
+        <li>Remote work</li>
+        <li>IT security</li>
+        <li>Code of conduct</li>
+      </ul>
+      <a class="library-link" href="https://github.com/AtelierGivre/compass-hr-agent#readme" target="_blank" rel="noreferrer">Read the docs <span aria-hidden="true">&#8599;</span></a>
+    </section>
   </main>
 
   <footer class="foot">
     <span>Clarion is a demo agent built with LangGraph, Gemini, MCP, and Postgres.</span>
+    <a href="https://github.com/AtelierGivre/compass-hr-agent" target="_blank" rel="noreferrer">Source on GitHub <span aria-hidden="true">&#8599;</span></a>
   </footer>
 
   <script src="/app.js"></script>

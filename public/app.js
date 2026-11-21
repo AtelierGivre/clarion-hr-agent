@@ -10,6 +10,7 @@ const els = {
   status: document.getElementById("status"),
   statusText: document.getElementById("status-text"),
   chatCard: document.querySelector(".chat-card"),
+  askCta: document.getElementById("ask-cta"),
 };
 
 const state = {
@@ -282,6 +283,13 @@ els.reset.addEventListener("click", () => {
   els.chatCard.classList.remove("has-messages");
   els.input.focus();
 });
+
+if (els.askCta) {
+  els.askCta.addEventListener("click", () => {
+    els.chatCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    focusInput();
+  });
+}
 
 checkHealth();
 loadEmployees().catch(() => {});
