@@ -2,8 +2,6 @@
 
 An HR and IT assistant that answers from company policy, reads employee records through an MCP server, and cites every claim.
 
-This repository is my submission for the GoAified AI internship assignment.
-
 **Live demo:** https://compass-hr-agent.vercel.app
 **Source:** https://github.com/AtelierGivre/compass-hr-agent
 **Stack:** Python, FastAPI, LangGraph, Google ADK, Gemini / Claude / OpenAI, MCP, Postgres with pgvector, Vercel
