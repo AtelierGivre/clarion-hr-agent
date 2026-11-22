@@ -152,13 +152,17 @@ def _fast_intent(question: str) -> Intent | None:
     )
 
 
-async def classify_intent(question: str) -> tuple[Intent, list[str]]:
+async def classify_intent(
+    question: str, provider: str | None = None
+) -> tuple[Intent, list[str]]:
     events: list[str] = []
     fast = _fast_intent(question)
     if fast is not None:
         return fast, ["scope_fast_path"]
     try:
-        classifier = get_llm(temperature=0).with_structured_output(Intent)
+        classifier = get_llm(temperature=0, provider=provider).with_structured_output(
+            Intent
+        )
         intent = await classifier.ainvoke(
             [("system", CLASSIFIER_PROMPT), ("human", question)]
         )
@@ -207,3 +211,65 @@ def citation_numbers(text: str) -> list[int]:
 
 def citation_order(text: str) -> list[int]:
     return [int(n) for n in re.findall(r"\[(\d{1,2})\]", text)]
+
+
+_NOT_FOUND_MARKERS = (
+    "could not find",
+    "couldn't find",
+    "do not have",
+    "don't have",
+    "not available",
+    "no information",
+    "not mentioned",
+)
+
+
+def _is_not_found(answer: str) -> bool:
+    lowered = answer.lower()
+    return any(marker in lowered for marker in _NOT_FOUND_MARKERS)
+
+
+def apply_output_guards(
+    answer: str, intent: dict, sources: list[dict]
+) -> tuple[str, list[dict], list[str]]:
+    """Shared output guard used by both the LangGraph and ADK agents.
+
+    Redacts PII, enforces citations for policy answers, replaces empty answers,
+    and renumbers markers so they match the returned source order.
+    """
+    events: list[str] = []
+    answer, findings = redact_pii((answer or "").strip())
+    if findings:
+        events.append(f"pii_redacted:{','.join(findings)}")
+
+    if intent.get("needs_policy") and sources and answer and not _is_not_found(answer):
+        valid = [n for n in citation_numbers(answer) if 1 <= n <= len(sources)]
+        if not valid:
+            labels = "; ".join(
+                f"[{index}] {source['title']}, {source['section']}"
+                for index, source in enumerate(sources[:3], start=1)
+            )
+            answer = f"{answer}\n\nSources: {labels}"
+            events.append("citations_added")
+
+    if not answer:
+        answer = REFUSAL_UNVERIFIED
+        events.append("note:empty_answer")
+
+    cited = [n for n in citation_order(answer) if 1 <= n <= len(sources)]
+    if cited:
+        order: list[int] = []
+        for number in cited:
+            if number not in order:
+                order.append(number)
+        order.extend(number for number in range(1, len(sources) + 1) if number not in order)
+        if order != list(range(1, len(sources) + 1)):
+            mapping = {old: new for new, old in enumerate(order, start=1)}
+            answer = re.sub(
+                r"\[(\d{1,2})\]",
+                lambda match: f"[{mapping.get(int(match.group(1)), int(match.group(1)))}]",
+                answer,
+            )
+            sources = [sources[index - 1] for index in order]
+
+    return answer, sources, events

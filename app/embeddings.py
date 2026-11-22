@@ -5,13 +5,23 @@ from google.genai import types
 
 from app.config import EMBEDDING_DIM, EMBEDDING_MODEL, GEMINI_API_KEY
 
-_client = genai.Client(api_key=GEMINI_API_KEY)
+_client = None
+
+
+def _get_client():
+    """Create the GenAI client on first use so imports need no API key."""
+    global _client
+    if _client is None:
+        if not GEMINI_API_KEY:
+            raise RuntimeError("GEMINI_API_KEY is required for embeddings")
+        _client = genai.Client(api_key=GEMINI_API_KEY)
+    return _client
 
 
 def _embed(texts: list[str], task_type: str) -> list[list[float]]:
     for attempt in range(4):
         try:
-            response = _client.models.embed_content(
+            response = _get_client().models.embed_content(
                 model=EMBEDDING_MODEL,
                 contents=texts,
                 config=types.EmbedContentConfig(

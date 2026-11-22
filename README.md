@@ -6,7 +6,7 @@ This repository is my submission for the GoAified AI internship assignment.
 
 **Live demo:** https://compass-hr-agent.vercel.app
 **Source:** https://github.com/AtelierGivre/compass-hr-agent
-**Stack:** Python, FastAPI, LangGraph, Gemini, MCP, Postgres with pgvector, Vercel
+**Stack:** Python, FastAPI, LangGraph, Google ADK, Gemini / Claude / OpenAI, MCP, Postgres with pgvector, Vercel
 
 ---
 
@@ -32,6 +32,7 @@ Try these in the live demo:
 | MCP server over Postgres for employee questions | [app/mcp_server.py](app/mcp_server.py), [app/mcp_client.py](app/mcp_client.py) | A real MCP server built with the official Python SDK runs over stdio and exposes two read only tools: `get_leave_balance` and `get_employee_profile`. The LangGraph agent connects as an MCP client and asks the model which tool to use. |
 | Guardrails | [app/guards.py](app/guards.py), guard nodes in [app/agent.py](app/agent.py) | Prompt injection detection, a scope classifier, row level tool authorization, PII redaction, citation checks, and an injection scan on retrieved text. See the table below. |
 | Ten test questions with answers | [tests/questions.json](tests/questions.json), [scripts/run_tests.py](scripts/run_tests.py), [tests/results.md](tests/results.md) | Twelve questions, including two prompt injection attempts, one unanswerable question, and one cross employee access attempt. Real answers are in the results section below. |
+| Two agent runtimes, three providers | [app/agent.py](app/agent.py), [app/adk_agent.py](app/adk_agent.py), [app/llm.py](app/llm.py) | The same guards and tools run in a LangGraph graph and in a Google ADK `LlmAgent`. `LLM_PROVIDER` selects Gemini, Claude, or OpenAI; `POST /api/chat` uses LangGraph and `POST /api/chat/adk` uses ADK. |
 
 ---
 
@@ -64,6 +65,31 @@ guard_input -> retrieve -> employee_tools -> generate -> guard_output
 
 ---
 
+## Two runtimes, three model providers
+
+Clarion now ships two agent implementations that share the same guardrails, retrieval, and MCP tools:
+
+| Runtime | Entry point | Notes |
+| --- | --- | --- |
+| LangGraph | `POST /api/chat` | Five-node `StateGraph`; the original implementation |
+| Google ADK | `POST /api/chat/adk` | `LlmAgent` with before/after model and before tool callbacks doing the same guardrail work |
+
+`app/llm.py` wraps `ChatGoogleGenerativeAI`, `ChatAnthropic`, and `ChatOpenAI` behind one `get_llm(provider=...)` function. Set `LLM_PROVIDER` to `gemini`, `anthropic`, or `openai` (or pass `provider` in a chat request / `--provider` to the test runner). Both runtimes expose the same response shape, so the demo UI and the twelve tests work unchanged.
+
+For ADK, Gemini uses ADK's native model; Claude and OpenAI use ADK's `LiteLlm` connector. Embeddings always use Gemini, so `GEMINI_API_KEY` is still required for the vector index.
+
+```bash
+# LangGraph with Claude
+python scripts/run_tests.py --agent langgraph --provider anthropic
+
+# ADK with OpenAI
+python scripts/run_tests.py --agent adk --provider openai
+```
+
+The ADK test run writes `tests/adk_results.md` and `tests/adk_results.json` so it never overwrites the original Gemini results.
+
+---
+
 ## Guardrails
 
 | Layer | Check | Behavior |
@@ -92,7 +118,7 @@ The MCP server is a separate process that talks to the same Postgres database. I
 
 ## Test results
 
-Twelve questions are sent through the real agent, the real vector index, the real MCP server, and the real model. The table shows what the agent answered and which guardrails fired.
+Twelve questions are sent through the real agent, the real vector index, the real MCP server, and the real model. The table shows what the agent answered and which guardrails fired. It is the original LangGraph/Gemini run; use `scripts/run_tests.py --agent adk --provider ...` to produce the equivalent ADK table in `tests/adk_results.md`.
 
 Twelve of twelve checks passed. Response times ranged from 6 ms for a blocked injection to 33 seconds for a personal profile lookup. The two injection attempts never reached a model call.
 
@@ -117,7 +143,7 @@ Full details, including tool calls and events, are in [tests/results.md](tests/r
 
 ## Run it locally
 
-You need Python 3.12 and a Gemini API key. The dev server brings its own Postgres with pgvector, so there is no database to install.
+You need Python 3.12. A Gemini API key is required for embeddings; add Anthropic and/or OpenAI keys only if you want to use those providers. The dev server brings its own Postgres with pgvector, so there is no database to install.
 
 ```bash
 py -3.12 -m venv .venv
@@ -126,7 +152,7 @@ pip install -r requirements-dev.txt
 copy .env.example .env
 ```
 
-Open `.env` and set `GEMINI_API_KEY`. Leave `DATABASE_URL` empty for local development.
+Open `.env` and set `GEMINI_API_KEY` (plus `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` for those providers). Leave `DATABASE_URL` empty for local development. `.env.example` is tracked; `.env` is ignored.
 
 ```bash
 python scripts/dev.py
@@ -134,13 +160,20 @@ python scripts/dev.py
 
 `scripts/dev.py` starts a local Postgres 16 with pgvector, creates the schema, seeds seven employees and the leave balances, embeds the five policy documents on first run, and serves the app at http://127.0.0.1:8000.
 
-To run the test suite:
+Unit tests need no API keys or database:
 
 ```bash
-python scripts/run_tests.py
+python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-It writes `tests/results.md` and `tests/results.json` and prints a pass count.
+To run the twelve end-to-end questions:
+
+```bash
+python scripts/run_tests.py                              # LangGraph + default provider
+python scripts/run_tests.py --agent adk --provider openai  # ADK + OpenAI
+```
+
+It writes `tests/results.md`/`.json` for LangGraph or `tests/adk_results.md`/`.json` for ADK, and prints a pass count.
 
 ---
 
@@ -153,7 +186,7 @@ It writes `tests/results.md` and `tests/results.json` and prints a pass count.
 python scripts/seed.py
 ```
 
-3. Set these environment variables in Vercel: `GEMINI_API_KEY`, `GEMINI_MODEL`, `EMBEDDING_MODEL`, `EMBEDDING_DIM`, `DATABASE_URL`.
+3. Set these environment variables in Vercel: `LLM_PROVIDER`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `EMBEDDING_MODEL`, `EMBEDDING_DIM`, `DATABASE_URL`, plus `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL` or `OPENAI_API_KEY`/`OPENAI_MODEL` if you switch providers.
 4. Deploy. `api/index.py` is the FastAPI function, `public/` is the static front end, and `vercel.json` raises the function limit to 60 seconds.
 
 The MCP server is shipped with the function and started by the agent on each request. This keeps the tool surface read only and avoids a second public endpoint.
@@ -162,7 +195,8 @@ The MCP server is shipped with the function and started by the agent on each req
 
 ## Choices and limits
 
-- **Model choice.** `gemini-3.5-flash-lite` was the fastest model that stayed available on this key during testing. `gemini-3.8-flash` returned 503s, and `gemini-2.5-flash` is closed to new keys. The model name is an environment variable, so switching is one line.
+- **Model choice.** `gemini-3.5-flash-lite` was the fastest model that stayed available on this key during testing. `gemini-3.8-flash` returned 503s, and `gemini-2.5-flash` is closed to new keys. Provider and model ids are environment variables (`LLM_PROVIDER`, `GEMINI_MODEL`, `ANTHROPIC_MODEL`, `OPENAI_MODEL`), so switching is one line.
+- **Runtime choice.** LangGraph and ADK produce the same response shape and pass through the same guardrails. ADK uses native Gemini or LiteLLM for Claude/OpenAI; `litellm` is pinned to a version after the March 2026 security advisory.
 - **Latency.** A typical answer takes 10 to 30 seconds. Between two and four model calls happen per question: scope, tool choice, and answer. The UI shows progress while it works. The function limit is 60 seconds.
 - **Vector search.** With 41 chunks, exact cosine search is instant. The HNSW index is created so the same query scales when the policy library grows.
 - **No login.** The demo lets you pick which employee you are, so reviewers can try the cross employee case. In production, the employee id would come from SSO, and the same tool guard already blocks cross employee reads.

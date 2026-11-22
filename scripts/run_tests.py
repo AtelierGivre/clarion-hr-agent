@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import json
 import sys
@@ -8,6 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.adk_agent import run_adk_agent  # noqa: E402
 from app.agent import run_agent  # noqa: E402
 
 QUESTIONS = json.loads((ROOT / "tests" / "questions.json").read_text(encoding="utf-8"))
@@ -61,10 +63,13 @@ def guard_summary(result: dict) -> str:
     return " · ".join(parts)
 
 
-async def run_one(item: dict) -> dict:
+async def run_one(item: dict, engine: str, provider: str) -> dict:
     started = time.perf_counter()
     try:
-        result = await run_agent(item["question"], item["employee_id"])
+        if engine == "adk":
+            result = await run_adk_agent(item["question"], item["employee_id"], provider)
+        else:
+            result = await run_agent(item["question"], item["employee_id"], provider)
         result["error"] = None
     except Exception as exc:
         result = {
@@ -105,23 +110,47 @@ def to_markdown(results: list[dict]) -> str:
 
 
 async def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--agent", choices=("langgraph", "adk"), default="langgraph"
+    )
+    parser.add_argument(
+        "--provider",
+        choices=("gemini", "anthropic", "openai"),
+        default=None,
+        help="Defaults to LLM_PROVIDER from the environment.",
+    )
+    args = parser.parse_args()
+
+    if args.provider is None:
+        from app.config import LLM_PROVIDER
+
+        provider = LLM_PROVIDER
+    else:
+        provider = args.provider
+
     results = []
     for item in QUESTIONS:
-        print(f"[{item['id']}/{len(QUESTIONS)}] {item['question'][:70]}", flush=True)
-        result = await run_one(item)
+        print(
+            f"[{args.agent}/{provider}] {item['id']}/{len(QUESTIONS)} "
+            f"{item['question'][:70]}",
+            flush=True,
+        )
+        result = await run_one(item, args.agent, provider)
         print(
             f"    {result['verdict']} in {result['latency_ms']} ms",
             flush=True,
         )
         results.append(result)
 
-    (ROOT / "tests" / "results.json").write_text(
+    prefix = "results" if args.agent == "langgraph" else "adk_results"
+    (ROOT / "tests" / f"{prefix}.json").write_text(
         json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    (ROOT / "tests" / "results.md").write_text(to_markdown(results), encoding="utf-8")
+    (ROOT / "tests" / f"{prefix}.md").write_text(to_markdown(results), encoding="utf-8")
 
     passed = sum(1 for result in results if result["verdict"] == "PASS")
-    print(f"\n{passed}/{len(results)} passed")
+    print(f"\n{passed}/{len(results)} passed ({args.agent}, {provider})")
 
 
 if __name__ == "__main__":

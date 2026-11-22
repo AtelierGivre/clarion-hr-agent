@@ -1,14 +1,13 @@
 import asyncio
 import json
 import operator
-import re
 import time
 from typing import Annotated, TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, StateGraph
 
-from app import db, guards
+from app import config, db, guards
 from app.config import MAX_TOOL_ROUNDS, MIN_SCORE, TOP_K
 from app.embeddings import embed_query, to_pg_vector
 from app.llm import get_llm
@@ -42,6 +41,7 @@ Rules:
 class AgentState(TypedDict):
     question: str
     employee_id: str
+    provider: str
     intent: dict
     sources: list[dict]
     tool_calls: list[dict]
@@ -85,7 +85,7 @@ async def guard_input(state: AgentState) -> dict:
             "events": [f"input_blocked:injection:{','.join(injection)}"],
         }
 
-    intent, notes = await guards.classify_intent(question)
+    intent, notes = await guards.classify_intent(question, state.get("provider"))
     events = ["scope_pass" if intent.in_scope else "scope_block"]
     events.extend(f"note:{note}" for note in notes)
     if not intent.in_scope:
@@ -156,7 +156,9 @@ async def employee_tools(state: AgentState) -> dict:
             if not allowed:
                 return {"events": ["note:mcp_tools_unavailable"]}
 
-            model = get_llm().bind_tools(list(allowed.values()))
+            model = get_llm(provider=state.get("provider")).bind_tools(
+                list(allowed.values())
+            )
             messages = [
                 SystemMessage(TOOL_PROMPT),
                 HumanMessage(
@@ -244,76 +246,18 @@ async def generate(state: AgentState) -> dict:
         f"Employee data from the HR system (via MCP):\n{employee_block}"
     )
 
-    response = await get_llm().ainvoke(
+    response = await get_llm(provider=state.get("provider")).ainvoke(
         [SystemMessage(ANSWER_PROMPT), HumanMessage(prompt)]
     )
     return {"answer": _message_text(response).strip(), "events": ["note:answer_generated"]}
 
 
-def _is_not_found(answer: str) -> bool:
-    lowered = answer.lower()
-    markers = [
-        "could not find",
-        "couldn't find",
-        "do not have",
-        "don't have",
-        "not available",
-        "no information",
-        "not mentioned",
-    ]
-    return any(marker in lowered for marker in markers)
-
-
 async def guard_output(state: AgentState) -> dict:
-    answer = state.get("answer", "").strip()
-    events: list[str] = []
-
-    answer, findings = guards.redact_pii(answer)
-    if findings:
-        events.append(f"pii_redacted:{','.join(findings)}")
-
-    intent = state.get("intent") or {}
-    sources = state.get("sources") or []
-    if intent.get("needs_policy") and sources and answer and not _is_not_found(answer):
-        valid = [
-            number
-            for number in guards.citation_numbers(answer)
-            if 1 <= number <= len(sources)
-        ]
-        if not valid:
-            labels = "; ".join(
-                f"[{index}] {source['title']}, {source['section']}"
-                for index, source in enumerate(sources[:3], start=1)
-            )
-            answer = f"{answer}\n\nSources: {labels}"
-            events.append("citations_added")
-
-    if not answer:
-        answer = guards.REFUSAL_UNVERIFIED
-        events.append("note:empty_answer")
-
-    cited = [
-        number
-        for number in guards.citation_order(answer)
-        if 1 <= number <= len(sources)
-    ]
-    if cited:
-        order: list[int] = []
-        for number in cited:
-            if number not in order:
-                order.append(number)
-        order.extend(
-            number for number in range(1, len(sources) + 1) if number not in order
-        )
-        if order != list(range(1, len(sources) + 1)):
-            mapping = {old: new for new, old in enumerate(order, start=1)}
-            answer = re.sub(
-                r"\[(\d{1,2})\]",
-                lambda match: f"[{mapping.get(int(match.group(1)), int(match.group(1)))}]",
-                answer,
-            )
-            sources = [sources[index - 1] for index in order]
-
+    answer, sources, events = guards.apply_output_guards(
+        state.get("answer", ""),
+        state.get("intent") or {},
+        state.get("sources") or [],
+    )
     return {"answer": answer, "sources": sources, "events": events}
 
 
@@ -393,12 +337,15 @@ def build_graph():
 GRAPH = build_graph()
 
 
-async def run_agent(question: str, employee_id: str) -> dict:
+async def run_agent(
+    question: str, employee_id: str, provider: str | None = None
+) -> dict:
     started = time.perf_counter()
     state = await GRAPH.ainvoke(
         {
             "question": question.strip(),
             "employee_id": employee_id.strip().upper(),
+            "provider": provider or config.LLM_PROVIDER,
             "intent": {},
             "sources": [],
             "tool_calls": [],
@@ -421,6 +368,7 @@ async def run_agent(question: str, employee_id: str) -> dict:
     return {
         "answer": state.get("answer", ""),
         "blocked": bool(state.get("blocked")),
+        "provider": state.get("provider", config.LLM_PROVIDER),
         "route": _route(state),
         "sources": sources,
         "tool_calls": [
